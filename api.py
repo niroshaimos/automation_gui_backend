@@ -14,7 +14,7 @@ CORS(app)
 app.config['JSON_SORT_KEYS'] = False
 app.config["DEBUG"] = True
 
-DEFAULT_PATH = '/home/nirandlucky/Desktop/automation_control.xml'
+XML_PATH = os.environ['XML_PATH']
 RESULTS_PATH = os.environ['RESULTS_PATH']
 
 # errors
@@ -172,7 +172,7 @@ def get_tests_from_test_params(test, test_params):  # ToDo: change this name and
 
 
 def create_run_cmd(test, result_path):
-    cmd = (f'/usr/bin/python3 -m pytest -rA --junitxml={result_path} -s {test["path"]} '
+    cmd = (f'/usr/bin/python3 -m pytest -rA --junitxml={result_path} -s {test["path"]} '  # TODO
            f'--pn \'{test["pn"]}\' '
            f'--sap_user \'{test["sapUser"]}\' '
            f'--password \'{test["password"]}\' ')
@@ -224,7 +224,7 @@ def append_run_results(results, new_results):
 
 @app.route('/api/v1/getAllTestTags', methods=['GET'])
 def get_all_tests_tags():  # find elements, also pretty useless
-    root = ET.parse(DEFAULT_PATH).getroot()
+    root = ET.parse(XML_PATH).getroot()
     test_collection = root.find('test_collection')
     test_tags = []
     for test in test_collection:
@@ -235,7 +235,7 @@ def get_all_tests_tags():  # find elements, also pretty useless
 
 @app.route('/api/v1/getTest/<test_tag>', methods=['GET'])
 def get_test(test_tag): # change to get test params
-    root = ET.parse(DEFAULT_PATH).getroot()
+    root = ET.parse(XML_PATH).getroot()
     test = root.find(f'./test_collection/test[@tag="{test_tag}"]')
     if test is None:
         return TEST_TAG_NOT_FOUND_404
@@ -245,7 +245,7 @@ def get_test(test_tag): # change to get test params
 
 @app.route('/api/v1/addTest/<test_tag>', methods=['POST'])
 def add_test(test_tag):
-    tree = ET.parse(DEFAULT_PATH)
+    tree = ET.parse(XML_PATH)
     root = tree.getroot()
     test_collection = root.find('test_collection')
     if valid_test_tag(test_collection=test_collection,
@@ -253,14 +253,14 @@ def add_test(test_tag):
         return INVALID_TEST_TAG_403
 
     test_collection.append(create_test(test_tag))
-    tree.write(DEFAULT_PATH)
+    tree.write(XML_PATH)
 
     return {'tag': test_tag, 'valid': False, 'active': False}, 202
 
 
 @app.route('/api/v1/removeTest/<test_tag>', methods=['DELETE'])
 def remove_test(test_tag):
-    tree = ET.parse(DEFAULT_PATH)
+    tree = ET.parse(XML_PATH)
     root = tree.getroot()
     try:
         delete_test(root=root,
@@ -268,7 +268,7 @@ def remove_test(test_tag):
     except TagNotFound:
         return TEST_TAG_NOT_FOUND_404
 
-    tree.write(DEFAULT_PATH)
+    tree.write(XML_PATH)
 
     return {'tag': test_tag}, 202
 
@@ -276,7 +276,7 @@ def remove_test(test_tag):
 @app.route('/api/v1/updateTest/<test_tag>', methods=['PATCH'])
 def update_test(test_tag):
     test_params = request.json
-    tree = ET.parse(DEFAULT_PATH)
+    tree = ET.parse(XML_PATH)
     root = tree.getroot()
     test = root.find(f'./test_collection/test[@tag="{test_tag}"]')
     if test is None:
@@ -295,7 +295,7 @@ def update_test(test_tag):
             test.remove(test.find('args'))
             test.append(args)
     test.attrib['valid'] = str(check_test_validity(test))
-    tree.write(DEFAULT_PATH)
+    tree.write(XML_PATH)
     return {'testTag': test_tag, 'valid': to_bool(test.attrib['valid'])}, 202
 
 
@@ -303,7 +303,7 @@ def update_test(test_tag):
 def set_test_active_state(test_tag):  # activate test
     json = request.json
 
-    tree = ET.parse(DEFAULT_PATH)
+    tree = ET.parse(XML_PATH)
     root = tree.getroot()
     test_collection = root.find('test_collection')
     test = get_test_from_collection(test_collection=test_collection,
@@ -316,14 +316,14 @@ def set_test_active_state(test_tag):  # activate test
 
     test.attrib['active'] = str(json['active'])
 
-    tree.write(DEFAULT_PATH)
+    tree.write(XML_PATH)
 
     return {'testTag': test_tag, 'active': json['active']}, 202
 
 
 @app.route('/api/v1/getAllActiveTests', methods=['GET'])
 def get_all_active_tests():
-    root = ET.parse(DEFAULT_PATH).getroot()
+    root = ET.parse(XML_PATH).getroot()
     test_collection = root.find('test_collection')
     active_tests = []
     for test in test_collection:
@@ -334,7 +334,7 @@ def get_all_active_tests():
 
 @app.route('/api/v1/getAllTestStatus', methods=['GET'])  # deprecated
 def get_all_tests_status():
-    root = ET.parse(DEFAULT_PATH).getroot()
+    root = ET.parse(XML_PATH).getroot()
     test_collection = root.find('test_collection')
 
     return jsonify([dict(zip(['tag', 'valid'], [elem.attrib['tag'], elem.attrib['valid']]))
@@ -343,7 +343,7 @@ def get_all_tests_status():
 
 @app.route('/api/v1/renameTest', methods=['PATCH'])
 def rename_test(old_tag, new_tag):
-    root = ET.parse(DEFAULT_PATH).getroot()
+    root = ET.parse(XML_PATH).getroot()
     test = root.find(f'./test_collection/test[@tag="{old_tag}"]')
     if test is None:
         return TEST_TAG_NOT_FOUND_404
@@ -359,7 +359,7 @@ def rename_test(old_tag, new_tag):
 
 @app.route('/api/v1/getAllTests', methods=['GET'])
 def get_all_tests():
-    root = ET.parse(DEFAULT_PATH).getroot()
+    root = ET.parse(XML_PATH).getroot()
     test_collection = root.find('test_collection')
 
     return jsonify([dict(zip(['tag', 'valid', 'active'],
@@ -369,11 +369,11 @@ def get_all_tests():
 
 @app.route('/api/v1/runTests', methods=['PUT'])
 def run_tests():
-    root = ET.parse(DEFAULT_PATH).getroot()
+    root = ET.parse(XML_PATH).getroot()
     test_collection = root.find('test_collection')
     tests_for_run = []
-    run_tag = f'{date.today().strftime("%d-%m-%Y")}_{datetime.now().strftime("%H:%M:%S")}'
-    result_path = f'{RESULTS_PATH}/{run_tag}'
+    run_tag = f'{date.today().strftime("%d-%m-%Y")}_{datetime.now().strftime("%H-%M-%S")}'
+    result_path = f'{RESULTS_PATH}{os.path.sep}{run_tag}'
     os.mkdir(result_path)
     # get all tests for run and their parameters
     for test in test_collection:
@@ -388,24 +388,24 @@ def run_tests():
     # create a run command for each test
     for test in tests_for_run:
         if 'tests' in test:
-            tag_result_path = f'{result_path}/{test["tag"]}'
+            tag_result_path = f'{result_path}{os.path.sep}{test["tag"]}'
             os.mkdir(tag_result_path)
             for i in range(len(test['tests'])):
                 run_commands.append(create_run_cmd(test=test['tests'][i],
-                                                   result_path=f'{tag_result_path}/{test["tag"]}_{i}'))
+                                                   result_path=f'{tag_result_path}{os.path.sep}{test["tag"]}_{i}'))
 
         else:
             run_commands.append(run_commands.append(create_run_cmd(test=test,
-                                                                   result_path=f'{result_path}/{test["tag"]}')))
+                                                                   result_path=f'{result_path}{os.path.sep}{test["tag"]}')))
 
-    threading.Thread(target=run_cmds, args=(run_commands, f'{result_path}/{run_tag}')).start()
+    threading.Thread(target=run_cmds, args=(run_commands, f'{result_path}{os.path.sep}{run_tag}')).start()
 
     return OK_200
 
 
 @app.route('/api/v1/getRunResults/<run_tag>')
 def get_run_results(run_tag):
-    run_path = f'{RESULTS_PATH}/{run_tag}'
+    run_path = f'{RESULTS_PATH}{os.path.sep}{run_tag}'
     try:
         files = os.listdir(run_path)
     except FileNotFoundError:
@@ -418,7 +418,7 @@ def get_run_results(run_tag):
         'failures': 0,
     }
     for file in files:
-        file_path = f'{run_path}/{file}'
+        file_path = f'{run_path}{os.path.sep}{file}'
         if file.endswith('.txt'):
             continue
 
@@ -426,7 +426,7 @@ def get_run_results(run_tag):
             for suite_test in os.listdir(file_path):
                 if not suite_test.endswith('.txt'):
                     append_run_results(results=run_results,
-                                       new_results=get_suite_results(suite_path=f'{file_path}/{suite_test}'))
+                                       new_results=get_suite_results(suite_path=f'{file_path}{os.path.sep}{suite_test}'))
         else:
             append_run_results(results=run_results,
                                new_results=get_suite_results(suite_path=file_path))
@@ -437,7 +437,7 @@ def get_run_results(run_tag):
 
 @app.route('/api/v1/getRunTests/<run_tag>')
 def get_run_tests(run_tag):
-    run_path = f'{RESULTS_PATH}/{run_tag}'
+    run_path = f'{RESULTS_PATH}{os.path.sep}{run_tag}'
     try:
         files = os.listdir(run_path)
     except FileNotFoundError:
@@ -447,11 +447,11 @@ def get_run_tests(run_tag):
         if file.endswith('.txt'):
             continue
 
-        suite_path = f'{run_path}/{file}'
+        suite_path = f'{run_path}{os.path.sep}{file}'
         if os.path.isdir(suite_path):
             for suite_test in os.listdir(suite_path):
                 if not suite_test.endswith('.txt'):
-                    tests.extend(get_suite_tests(test_path=f'{suite_path}/{suite_test}',
+                    tests.extend(get_suite_tests(test_path=f'{suite_path}{os.path.sep}{suite_test}',
                                                  suite_name=file,
                                                  suite_test=suite_test))
 
@@ -466,10 +466,10 @@ def get_run_tests(run_tag):
 @app.route('/api/v1/getTestLog/<run_tag>/<suite_file>/<suite_test>/<index>')
 def get_test_log(run_tag, suite_file, suite_test, index):
     index = int(index)  # find a better solution
-    file_path = f'{RESULTS_PATH}/{run_tag}/{suite_file}'
+    file_path = f'{RESULTS_PATH}{os.path.sep}{run_tag}{os.path.sep}{suite_file}'
     try:
         if os.path.isdir(file_path):
-            root = ET.parse(f'{file_path}/{suite_test}')
+            root = ET.parse(f'{file_path}{os.path.sep}{suite_test}')
         else:
             root = ET.parse(file_path)
     except FileNotFoundError:
@@ -507,11 +507,11 @@ def get_all_runs():
 
 @app.route('/api/v1/getTestVariables/<run_tag>/<suite_file>/<suite_test>')
 def get_test_variables(run_tag, suite_file, suite_test):
-    file_path = f'{RESULTS_PATH}/{run_tag}/{suite_file}'
+    file_path = f'{RESULTS_PATH}{os.path.sep}{run_tag}{os.path.sep}{suite_file}'
 
     try:
         if os.path.isdir(file_path):
-            test_vars_file = f'{file_path}/{suite_test}_vars.txt'
+            test_vars_file = f'{file_path}{os.path.sep}{suite_test}_vars.txt'
         else:
             test_vars_file = f'{file_path}_vars.txt'
     except FileNotFoundError:
